@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supply & Demand Graph Quiz</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1c2230; --muted:#5b6474; --line:#dfe3ea;
+    --accent:#0f766e; --accent-ink:#ffffff; --demand:#2563eb; --supply:#ea580c;
+    --ok:#15803d; --bad:#b91c1c; --warn:#b45309; --soft:#eef2f7; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{padding:16px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  h2{font-size:1.15rem;margin:0 0 10px}
+  h3{font-size:1rem;margin:0 0 6px}
+  p{margin:0 0 10px}
+  .muted{color:var(--muted);font-size:.92rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:0 0 16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1 1 200px}
+  label{display:block;font-size:.88rem;color:var(--muted);margin-bottom:3px}
+  input[type=text],input[type=number],input[type=password],textarea,select{
+    width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  textarea{min-height:70px;resize:vertical}
+  input[type=number]{width:80px}
+  button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+  button:hover{background:var(--soft)}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--bad);border-color:#f3c5c5}
+  button.small{padding:4px 10px;font-size:.88rem}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .tabs button{border-radius:999px}
+  .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.8rem;background:var(--soft);color:var(--muted)}
+  .pill.ok{background:#dcfce7;color:var(--ok)} .pill.bad{background:#fee2e2;color:var(--bad)} .pill.warn{background:#fef3c7;color:var(--warn)}
+  .graph{width:100%;max-width:460px;touch-action:none;user-select:none;-webkit-user-select:none;display:block}
+  .graph .hit{stroke:transparent;stroke-width:22;fill:none;cursor:grab}
+  .graph .hit.locked{cursor:default}
+  .graph .hit:active{cursor:grabbing}
+  .curve-controls{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .ctl{display:flex;align-items:center;gap:6px;font-size:.92rem}
+  .ctl .name{font-weight:600;min-width:70px}
+  .ctl.d .name{color:var(--demand)} .ctl.s .name{color:var(--supply)}
+  .ctl .val{min-width:120px;color:var(--muted);font-size:.85rem}
+  .qcard{border-left:4px solid var(--accent)}
+  .qnum{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .scenario{font-size:1.05rem;margin:4px 0 12px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+  .qlist{display:flex;flex-direction:column;gap:8px}
+  .qitem{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+  .qitem.active{border-color:var(--accent);background:#ecfdf5}
+  .qitem .t{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;max-height:340px}
+  .linkbox{word-break:break-all;background:var(--soft);padding:10px;border-radius:8px;font-size:.85rem}
+  table{width:100%;border-collapse:collapse;font-size:.92rem}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr.sel td{background:#ecfdf5}
+  tbody tr{cursor:pointer}
+  .status{font-size:.9rem;margin-top:8px}
+  .status.ok{color:var(--ok)} .status.bad{color:var(--bad)}
+  .checks{display:flex;gap:14px;flex-wrap:wrap}
+  .checks label{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:.92rem}
+  .hidden{display:none !important}
+  .banner{background:#fef3c7;border:1px solid #fcd34d;color:#78350f;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:.92rem}
+  .grade-q{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.92rem}
+  .score{font-weight:700}
+  .steps li{margin-bottom:6px}
+  .mini .graph{max-width:300px}
+  footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<footer>Supply &amp; Demand Graph Quiz</footer>
+
+<script>
+/* ============================================================
+   MODEL: straight-line demand and supply on a 0–10 grid.
+   Demand:  P = a_d − b·(Q − sd)     (sd = horizontal shift)
+   Supply:  P = a_s + c·(Q − ss)     (ss = horizontal shift)
+   Shifts are whole units from −3 (left) to +3 (right).
+   ============================================================ */
+const M = { a_d: 8, b: 0.6, a_s: 1, c: 0.6, max: 10, lim: 3 };
+function equilibrium(sd, ss){
+  const Q = (M.a_d - M.a_s + M.b*sd + M.c*ss) / (M.b + M.c);
+  const P = M.a_d - M.b*(Q - sd);
+  return { Q, P };
+}
+function demandSeg(s){ return clipSeg(Q => M.a_d - M.b*(Q - s), p => s + (M.a_d - p)/M.b); }
+function supplySeg(s){ return clipSeg(Q => M.a_s + M.c*(Q - s), p => s + (p - M.a_s)/M.c); }
+function clipSeg(P, Pinv){
+  const qs = [Pinv(0), Pinv(M.max)].sort((a,b)=>a-b);
+  const lo = Math.max(0, qs[0]), hi = Math.min(M.max, qs[1]);
+  if (hi <= lo) return null;
+  return [[lo, P(lo)], [hi, P(hi)]];
+}
+const clampShift = v => Math.max(-M.lim, Math.min(M.lim, Math.round(v)));
+
+/* Theory-based expected change in equilibrium (what the textbook says). */
+function expectedChange(keyD, keyS){
+  const d = Math.sign(keyD), s = Math.sign(keyS);
+  let p = 'same', q = 'same';
+  if (d !== 0 && s === 0){ p = d > 0 ? 'up' : 'down'; q = d > 0 ? 'up' : 'down'; }
+  else if (d === 0 && s !== 0){ p = s > 0 ? 'down' : 'up'; q = s > 0 ? 'up' : 'down'; }
+  else if (d !== 0 && s !== 0){
+    if (d === s){ q = d > 0 ? 'up' : 'down'; p = 'indet'; }
+    else { p = d > 0 ? 'up' : 'down'; q = 'indet'; }
+  }
+  return { p, q };
+}
+const CHANGE_LABEL = { up:'Increases', down:'Decreases', same:'Stays the same', indet:'Cannot be determined' };
+const SHIFT_LABEL = v => v === 0 ? 'no shift' : (v > 0 ? `right ${v}` : `left ${-v}`);
+
+/* ============================================================
+   GRAPH RENDERER (SVG). state = {d, s}; opts = {mv, interactive, id, onChange}
+   mv: 'd' | 's' | 'b' | 'none'
+   ============================================================ */
+const G = { W: 440, H: 350, x0: 46, y0: 18, w: 360, h: 280 };
+const sx = Q => G.x0 + Q / M.max * G.w;
+const sy = P => G.y0 + G.h - P / M.max * G.h;
+
+function graphSVG(state, opts){
+  const mv = opts.mv || 'none';
+  const canD = opts.interactive && (mv === 'd' || mv === 'b');
+  const canS = opts.interactive && (mv === 's' || mv === 'b');
+  const e1 = equilibrium(0, 0), e2 = equilibrium(state.d, state.s);
+  const moved = state.d !== 0 || state.s !== 0;
+  let out = `<svg class="graph" viewBox="0 0 ${G.W} ${G.H}" data-gid="${opts.id}" role="img" aria-label="Supply and demand graph">`;
+  // grid
+  for (let i = 0; i <= M.max; i += 2){
+    out += `<line x1="${sx(i)}" y1="${G.y0}" x2="${sx(i)}" y2="${G.y0+G.h}" stroke="#eef0f4"/>`;
+    out += `<line x1="${G.x0}" y1="${sy(i)}" x2="${G.x0+G.w}" y2="${sy(i)}" stroke="#eef0f4"/>`;
+  }
+  // axes
+  out += `<line x1="${G.x0}" y1="${G.y0}" x2="${G.x0}" y2="${G.y0+G.h}" stroke="#1c2230" stroke-width="1.5"/>`;
+  out += `<line x1="${G.x0}" y1="${G.y0+G.h}" x2="${G.x0+G.w}" y2="${G.y0+G.h}" stroke="#1c2230" stroke-width="1.5"/>`;
+  out += `<text x="${G.x0+G.w/2}" y="${G.H-8}" text-anchor="middle" font-size="13" fill="#1c2230">Quantity</text>`;
+  out += `<text transform="translate(14 ${G.y0+G.h/2}) rotate(-90)" text-anchor="middle" font-size="13" fill="#1c2230">Price</text>`;
+
+  const line = (seg, color, dash, width) => seg ? `<line x1="${sx(seg[0][0])}" y1="${sy(seg[0][1])}" x2="${sx(seg[1][0])}" y2="${sy(seg[1][1])}" stroke="${color}" stroke-width="${width}" ${dash?'stroke-dasharray="7 5"':''} stroke-linecap="round"/>` : '';
+  const label = (seg, text, color, end) => {
+    if (!seg) return '';
+    const p = seg[end]; const x = sx(p[0]) + (end ? 6 : -6), y = sy(p[1]) + (end ? -6 : -6);
+    return `<text x="${x}" y="${y}" font-size="13" font-weight="700" fill="${color}" text-anchor="${end?'start':'end'}">${text}</text>`;
+  };
+  const guide = (e, color, tag) => {
+    const x = sx(e.Q), y = sy(e.P);
+    return `<line x1="${G.x0}" y1="${y}" x2="${x}" y2="${y}" stroke="${color}" stroke-dasharray="3 4"/>
+            <line x1="${x}" y1="${y}" x2="${x}" y2="${G.y0+G.h}" stroke="${color}" stroke-dasharray="3 4"/>
+            <text x="${G.x0-5}" y="${y+4}" font-size="11" text-anchor="end" fill="${color}">P${tag}</text>
+            <text x="${x}" y="${G.y0+G.h+14}" font-size="11" text-anchor="middle" fill="${color}">Q${tag}</text>`;
+  };
+  // original curves (dashed once something moved)
+  const d1 = demandSeg(0), s1 = supplySeg(0), d2 = demandSeg(state.d), s2 = supplySeg(state.s);
+  if (moved){
+    if (state.d !== 0) { out += line(d1, '#93c5fd', true, 2) + label(d1, 'D1', '#60a5fa', 0); }
+    if (state.s !== 0) { out += line(s1, '#fdba74', true, 2) + label(s1, 'S1', '#fb923c', 1); }
+    out += guide(e1, '#9aa3b2', '1');
+  }
+  out += guide(e2, moved ? '#0f766e' : '#9aa3b2', moved ? '2' : '');
+  out += line(d2, 'var(--demand)', false, 3) + label(d2, state.d !== 0 ? 'D2' : 'D', 'var(--demand)', 0);
+  out += line(s2, 'var(--supply)', false, 3) + label(s2, state.s !== 0 ? 'S2' : 'S', 'var(--supply)', 1);
+  // equilibrium dots
+  if (moved) out += `<circle cx="${sx(e1.Q)}" cy="${sy(e1.P)}" r="4" fill="#9aa3b2"/>`;
+  out += `<circle cx="${sx(e2.Q)}" cy="${sy(e2.P)}" r="5" fill="${moved?'#0f766e':'#1c2230'}"/>`;
+  // hit areas (on top)
+  if (opts.interactive){
+    if (d2) out += `<line class="hit ${canD?'':'locked'}" data-curve="d" x1="${sx(d2[0][0])}" y1="${sy(d2[0][1])}" x2="${sx(d2[1][0])}" y2="${sy(d2[1][1])}"/>`;
+    if (s2) out += `<line class="hit ${canS?'':'locked'}" data-curve="s" x1="${sx(s2[0][0])}" y1="${sy(s2[0][1])}" x2="${sx(s2[1][0])}" y2="${sy(s2[1][1])}"/>`;
+  }
+  out += `</svg>`;
+  return out;
+}
+
+/* Mount an interactive graph into a container. Returns {get,set}. */
+function mountGraph(container, state, opts){
+  opts = Object.assign({ interactive: true, mv: 'b' }, opts || {});
+  state = Object.assign({ d: 0, s: 0 }, state || {});
+  const id = opts.id || ('g' + Math.random().toString(36).slice(2, 8));
+  const canMove = k => opts.interactive && (opts.mv === 'b' || opts.mv === k);
+  let drag = null;
+
+  function controls(){
+    if (!opts.interactive) return '';
+    let html = '<div class="curve-controls">';
+    for (const [k, name] of [['d','Demand'],['s','Supply']]){
+      if (!canMove(k)) continue;
+      html += `<div class="ctl ${k}"><span class="name">${name}</span>
+        <button class="small" data-act="left" data-k="${k}" title="Shift ${name} left">◀</button>
+        <button class="small" data-act="right" data-k="${k}" title="Shift ${name} right">▶</button>
+        <button class="small" data-act="reset" data-k="${k}">Reset</button>
+        <span class="val">${SHIFT_LABEL(state[k])}</span></div>`;
+    }
+    return html + '</div>';
+  }
+  function draw(){
+    container.innerHTML = graphSVG(state, { mv: opts.mv, interactive: opts.interactive, id }) + controls();
+  }
+  function set(k, v){
+    v = clampShift(v);
+    if (state[k] === v) return;
+    state[k] = v; draw();
+    if (opts.onChange) opts.onChange({ ...state });
+  }
+  container.addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    const k = b.dataset.k;
+    if (b.dataset.act === 'left') set(k, state[k] - 1);
+    else if (b.dataset.act === 'right') set(k, state[k] + 1);
+    else set(k, 0);
+  });
+  container.addEventListener('pointerdown', e => {
+    const hit = e.target.closest('.hit'); if (!hit || hit.classList.contains('locked')) return;
+    const svg = container.querySelector('svg');
+    const pxPerQ = svg.getBoundingClientRect().width / G.W * (G.w / M.max);
+    drag = { k: hit.dataset.curve, x: e.clientX, start: state[hit.dataset.curve], pxPerQ };
+    e.preventDefault();
+  });
+  window.addEventListener('pointermove', e => {
+    if (!drag) return;
+    set(drag.k, drag.start + (e.clientX - drag.x) / drag.pxPerQ);
+  });
+  window.addEventListener('pointerup', () => { drag = null; });
+  window.addEventListener('pointercancel', () => { drag = null; });
+  draw();
+  return { get: () => ({ ...state }), setState: s => { state = Object.assign({d:0,s:0}, s); draw(); } };
+}
+
+/* ============================================================
+   STORAGE / ENCODING HELPERS
+   ============================================================ */
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+function b64uEncode(obj){
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64uDecode(str){
+  str = str.replace(/-/g,'+').replace(/_/g,'/'); while (str.length % 4) str += '=';
+  const bin = atob(str); const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+function copyText(t, btn){ navigator.clipboard?.writeText(t).then(()=>{ if(btn){ const o=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=o,1500);} }); }
+function download(name, text, type='application/json'){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+const DEFAULT_EXPL = 'Explain which curve shifted, why it shifted, and what happened to the equilibrium price and quantity.';
+function newQuestion(){
+  return { id: uid(), scenario: '', mv: 'b', key: { d: 0, s: 0 }, expP: 'auto', expQ: 'auto',
+           askP: true, askQ: true, askE: true, explPrompt: DEFAULT_EXPL,
+           pts: { shift: 2, p: 1, q: 1, e: 2 } };
+}
+function newQuiz(){
+  return { id: uid(), title: 'Supply & Demand Quiz', questions: [newQuestion()], created: Date.now() };
+}
+/* A ready-to-use sample quiz for first launch. */
+function sampleQuiz(){
+  const mk = (scenario, mv, d, s) => Object.assign(newQuestion(), { scenario, mv, key: { d, s } });
+  return { id: uid(), title: 'Supply & Demand Graph Quiz (sample)', created: Date.now(), questions: [
+    mk('It is the end of summer in Pennsylvania and a clothing store still has a lot of bathing suits it has not sold. Show what happens in the market for bathing suits as summer ends.', 'd', -2, 0),
+    mk('A new factory makes it much cheaper to produce sneakers. Show what happens in the market for sneakers.', 's', 0, 2),
+    mk('A popular influencer starts wearing a certain brand of hoodie, and at the same time the cost of the fabric used to make it goes up. Show what happens in the market for that hoodie.', 'b', 2, -2)
+  ] };
+}
+function resolvedExpected(q){
+  const auto = expectedChange(q.key.d, q.key.s);
+  return { p: q.expP === 'auto' ? auto.p : q.expP, q: q.expQ === 'auto' ? auto.q : q.expQ };
+}
+function questionPoints(q){ return (q.pts.shift||0) + (q.askP?q.pts.p||0:0) + (q.askQ?q.pts.q||0:0) + (q.askE?q.pts.e||0:0); }
+function quizPoints(quiz){ return quiz.questions.reduce((a,q)=>a+questionPoints(q),0); }
+
+/* Student payload: questions only — no answer key, no expected answers. */
+function studentPayload(quiz, settings){
+  return { v: 1, id: quiz.id, t: quiz.title, u: settings.scriptUrl || '',
+    q: quiz.questions.map(q => ({ s: q.scenario, mv: q.mv, ask: [q.askP?1:0, q.askQ?1:0, q.askE?1:0], ep: q.explPrompt, pts: q.pts })) };
+}
+function studentLink(quiz, settings){
+  return location.origin + location.pathname + '#q=' + b64uEncode(studentPayload(quiz, settings));
+}
+
+/* ============================================================
+   AUTO-SCORING
+   ============================================================ */
+function scoreQuestion(q, ans){
+  ans = ans || {}; const res = { parts: [], auto: 0, max: questionPoints(q) };
+  // shift
+  const curves = q.mv === 'b' ? ['d','s'] : [q.mv];
+  let correct = 0;
+  for (const k of curves){ if (Math.sign(ans[k]||0) === Math.sign(q.key[k]||0)) correct++; }
+  const shiftPts = curves.length ? Math.round((q.pts.shift||0) * correct / curves.length * 100)/100 : 0;
+  res.parts.push({ name: 'Curve shift', got: shiftPts, max: q.pts.shift||0,
+    detail: curves.map(k => `${k==='d'?'Demand':'Supply'}: student ${SHIFT_LABEL(ans[k]||0)}, key ${SHIFT_LABEL(q.key[k]||0)}`).join(' · ') });
+  res.auto += shiftPts;
+  const exp = resolvedExpected(q);
+  if (q.askP){ const ok = ans.p === exp.p; const g = ok ? (q.pts.p||0) : 0; res.auto += g;
+    res.parts.push({ name: 'Equilibrium price', got: g, max: q.pts.p||0, detail: `student: ${CHANGE_LABEL[ans.p]||'—'} · key: ${CHANGE_LABEL[exp.p]}` }); }
+  if (q.askQ){ const ok = ans.q === exp.q; const g = ok ? (q.pts.q||0) : 0; res.auto += g;
+    res.parts.push({ name: 'Equilibrium quantity', got: g, max: q.pts.q||0, detail: `student: ${CHANGE_LABEL[ans.q]||'—'} · key: ${CHANGE_LABEL[exp.q]}` }); }
+  return res;
+}
+
+/* ============================================================
+   ROUTING
+   ============================================================ */
+const app = $('#app');
+function route(){
+  const h = location.hash || '';
+  if (h.startsWith('#q=')) { try { renderStudent(b64uDecode(h.slice(3))); } catch(e){ app.innerHTML = '<div class="card"><h2>This quiz link is not valid.</h2><p class="muted">Ask your teacher for a new link.</p></div>'; } }
+  else renderTeacher();
+}
+window.addEventListener('hashchange', route);
+
+/* ============================================================
+   STUDENT VIEW
+   ============================================================ */
+function renderStudent(qz){
+  const key = 'sdq.student.' + qz.id;
+  const saved = LS.get(key, { name:'', period:'', answers: qz.q.map(()=>({d:0,s:0,p:'',q:'',e:''})), submitted:null });
+  if (saved.answers.length !== qz.q.length) saved.answers = qz.q.map(()=>({d:0,s:0,p:'',q:'',e:''}));
+  const total = qz.q.reduce((a,q)=>a+(q.pts.shift||0)+(q.ask[0]?q.pts.p||0:0)+(q.ask[1]?q.pts.q||0:0)+(q.ask[2]?q.pts.e||0:0),0);
+
+  if (saved.submitted){ return renderSubmitted(qz, saved); }
+
+  const changeOpts = sel => ['up','down','same','indet'].map(v=>`<option value="${v}" ${sel===v?'selected':''}>${CHANGE_LABEL[v]}</option>`).join('');
+  let html = `<div class="card"><h1>${esc(qz.t)}</h1>
+    <p class="muted">${qz.q.length} question${qz.q.length===1?'':'s'} · ${total} points</p>
+    <div class="row"><div class="grow"><label>Your name</label><input type="text" id="stName" value="${esc(saved.name)}" placeholder="First and last name" autocomplete="off"></div>
+    <div style="flex:0 0 140px"><label>Period</label><input type="text" id="stPeriod" value="${esc(saved.period)}" placeholder="e.g. 3" autocomplete="off"></div></div>
+    <p class="muted" style="margin-top:10px"><b>How to answer:</b> drag a curve left or right on the graph (or use the ◀ ▶ buttons). The dashed line shows where the curve started. Your work saves on this Chromebook as you go; press <b>Submit</b> at the bottom when you are finished.</p></div>`;
+  qz.q.forEach((q, i) => {
+    const mvText = q.mv === 'b' ? 'You may move demand, supply, or both.' : (q.mv === 'd' ? 'You may move the demand curve.' : 'You may move the supply curve.');
+    html += `<div class="card qcard"><div class="qnum">Question ${i+1}</div><p class="scenario">${esc(q.s)}</p>
+      <p class="muted">${mvText}</p>
+      <div class="two"><div><div id="sg${i}"></div></div><div>`;
+    if (q.ask[0]) html += `<label>What happens to the equilibrium <b>price</b>? (${q.pts.p} pt)</label><select data-q="${i}" data-f="p"><option value="">Choose…</option>${changeOpts(saved.answers[i].p)}</select><br><br>`;
+    if (q.ask[1]) html += `<label>What happens to the equilibrium <b>quantity</b>? (${q.pts.q} pt)</label><select data-q="${i}" data-f="q"><option value="">Choose…</option>${changeOpts(saved.answers[i].q)}</select><br><br>`;
+    if (q.ask[2]) html += `<label>${esc(q.ep||DEFAULT_EXPL)} (${q.pts.e} pt)</label><textarea data-q="${i}" data-f="e" placeholder="Type your explanation…">${esc(saved.answers[i].e)}</textarea>`;
+    html += `</div></div></div>`;
+  });
+  html += `<div class="card"><button class="primary" id="stSubmit">Submit quiz</button> <span class="muted">You can only submit once.</span><div id="stStatus" class="status"></div></div>`;
+  app.innerHTML = html;
+
+  const persist = () => LS.set(key, saved);
+  qz.q.forEach((q, i) => mountGraph($('#sg'+i), { d: saved.answers[i].d, s: saved.answers[i].s }, { mv: q.mv, onChange: st => { saved.answers[i].d = st.d; saved.answers[i].s = st.s; persist(); } }));
+  app.addEventListener('input', e => {
+    const t = e.target;
+    if (t.id === 'stName') saved.name = t.value;
+    else if (t.id === 'stPeriod') saved.period = t.value;
+    else if (t.dataset.q !== undefined) saved.answers[+t.dataset.q][t.dataset.f] = t.value;
+    persist();
+  });
+  $('#stSubmit').addEventListener('click', async () => {
+    const st = $('#stStatus');
+    if (!saved.name.trim()) { st.className='status bad'; st.textContent='Please enter your name before submitting.'; $('#stName').focus(); return; }
+    const missing = [];
+    qz.q.forEach((q,i)=>{ const a=saved.answers[i]; if ((q.ask[0]&&!a.p)||(q.ask[1]&&!a.q)||(q.ask[2]&&!a.e.trim())) missing.push(i+1); });
+    if (missing.length && !confirm(`Question${missing.length>1?'s':''} ${missing.join(', ')} ${missing.length>1?'are':'is'} not finished. Submit anyway?`)) return;
+    if (!confirm('Submit your quiz now? You will not be able to change your answers.')) return;
+    const payload = { v:1, sid: uid(), quizId: qz.id, quizTitle: qz.t, name: saved.name.trim(), period: saved.period.trim(),
+      submittedAt: new Date().toISOString(), answers: saved.answers };
+    $('#stSubmit').disabled = true; st.className='status'; st.textContent='Submitting…';
+    let sent = false, err = '';
+    if (qz.u){
+      try {
+        const r = await fetch(qz.u, { method:'POST', body: JSON.stringify(payload) });
+        const j = await r.json().catch(()=>({}));
+        sent = !!(j && j.ok);
+        if (!sent) err = (j && j.error) || ('HTTP ' + r.status);
+      } catch(e){ err = e.message; }
+    } else err = 'No online collection set up for this quiz.';
+    saved.submitted = { at: payload.submittedAt, sent, code: b64uEncode(payload), sid: payload.sid, err };
+    persist();
+    renderSubmitted(qz, saved);
+  });
+}
+function renderSubmitted(qz, saved){
+  const s = saved.submitted;
+  app.innerHTML = `<div class="card"><h1>${esc(qz.t)}</h1>
+    ${s.sent ? `<p><span class="pill ok">Submitted</span></p><p>Thanks, ${esc(saved.name)}. Your answers were sent to your teacher at ${new Date(s.at).toLocaleTimeString()}.</p>
+      <p class="muted">Confirmation code: <code>${s.sid}</code></p>`
+    : `<p><span class="pill warn">Saved on this device — not sent online</span></p>
+      <p>Your answers are locked, but they could not be sent automatically${s.err?` (${esc(s.err)})`:''}. Give your teacher your answers one of these ways:</p>
+      <p><button id="dlAns">Download my answers file</button> <button id="cpAns">Copy my answer code</button></p>
+      <p class="muted">Turn the file in on Google Classroom, or paste the code into the assignment.</p>
+      <details><summary class="muted">Show answer code</summary><div class="linkbox">${s.code}</div></details>`}
+    </div>`;
+  const fname = `${(saved.name||'student').replace(/[^a-z0-9]+/gi,'_')}_${qz.id}.sdq.json`;
+  $('#dlAns')?.addEventListener('click', ()=>download(fname, JSON.stringify(b64uDecode(s.code), null, 1)));
+  $('#cpAns')?.addEventListener('click', e=>copyText(s.code, e.target));
+}
+
+/* ============================================================
+   TEACHER VIEW
+   ============================================================ */
+const T = {
+  quizzes: LS.get('sdq.quizzes', null),
+  settings: LS.get('sdq.settings', { scriptUrl:'', secret:'' }),
+  grades: LS.get('sdq.grades', {}),
+  subs: [],            // loaded submissions for current quiz
+  tab: LS.get('sdq.tab', 'build'),
+  cur: LS.get('sdq.cur', null),
+  qi: 0, selSub: null
+};
+if (!T.quizzes || !T.quizzes.length){ T.quizzes = [sampleQuiz()]; }
+if (!T.cur || !T.quizzes.find(q=>q.id===T.cur)) T.cur = T.quizzes[0].id;
+const curQuiz = () => T.quizzes.find(q=>q.id===T.cur);
+function saveAll(){ LS.set('sdq.quizzes', T.quizzes); LS.set('sdq.settings', T.settings); LS.set('sdq.grades', T.grades); LS.set('sdq.tab', T.tab); LS.set('sdq.cur', T.cur); }
+
+function renderTeacher(){
+  const quiz = curQuiz();
+  const isFile = location.protocol === 'file:';
+  app.innerHTML = `
+    <div class="row" style="margin-bottom:12px"><div class="grow"><h1>Supply &amp; Demand Graph Quiz — Teacher</h1>
+      <p class="muted">Build questions, share one link with students, then grade their graphs here.</p></div>
+      <div><label>Quiz</label><div class="row"><select id="quizSel">${T.quizzes.map(q=>`<option value="${q.id}" ${q.id===T.cur?'selected':''}>${esc(q.title)}</option>`).join('')}</select>
+      <button class="small" id="quizNew">+ New</button><button class="small" id="quizDup">Duplicate</button><button class="small danger" id="quizDel">Delete</button></div></div></div>
+    ${isFile ? '<div class="banner"><b>Heads up:</b> you opened this file directly from your computer. Everything works for building and grading, but the student link will only work once this file is hosted online (GitHub Pages, Google Sites file, school web server). See the Settings tab.</div>' : ''}
+    <div class="tabs">${[['build','1. Build questions'],['share','2. Share with students'],['grade','3. Grade'],['settings','Settings & setup']].map(([k,l])=>`<button data-tab="${k}" class="${T.tab===k?'active':''}">${l}</button>`).join('')}</div>
+    <div id="tabBody"></div>`;
+  $('#quizSel').addEventListener('change', e=>{ T.cur = e.target.value; T.qi = 0; T.subs = []; T.selSub = null; saveAll(); renderTeacher(); });
+  $('#quizNew').addEventListener('click', ()=>{ const q = newQuiz(); T.quizzes.push(q); T.cur = q.id; T.qi = 0; T.subs=[]; T.selSub=null; saveAll(); renderTeacher(); });
+  $('#quizDup').addEventListener('click', ()=>{ const q = JSON.parse(JSON.stringify(quiz)); q.id = uid(); q.title += ' (copy)'; q.questions.forEach(x=>x.id=uid()); T.quizzes.push(q); T.cur=q.id; T.qi=0; T.subs=[]; T.selSub=null; saveAll(); renderTeacher(); });
+  $('#quizDel').addEventListener('click', ()=>{ if (!confirm(`Delete "${quiz.title}"? Students' submissions in your Google Sheet are not affected.`)) return; T.quizzes = T.quizzes.filter(q=>q.id!==quiz.id); if(!T.quizzes.length) T.quizzes=[newQuiz()]; T.cur=T.quizzes[0].id; T.qi=0; T.subs=[]; T.selSub=null; saveAll(); renderTeacher(); });
+  $$('.tabs button').forEach(b=>b.addEventListener('click', ()=>{ T.tab = b.dataset.tab; saveAll(); renderTeacher(); }));
+  ({ build: renderBuild, share: renderShare, grade: renderGrade, settings: renderSettings })[T.tab]($('#tabBody'));
+}
+
+/* ---------- Build tab ---------- */
+function renderBuild(root){
+  const quiz = curQuiz();
+  if (T.qi >= quiz.questions.length) T.qi = Math.max(0, quiz.questions.length-1);
+  const q = quiz.questions[T.qi];
+  const auto = expectedChange(q.key.d, q.key.s);
+  const expOpts = (sel, autoVal) => [['auto',`Auto from key (${CHANGE_LABEL[autoVal]})`],['up','Increases'],['down','Decreases'],['same','Stays the same'],['indet','Cannot be determined']]
+    .map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('');
+  root.innerHTML = `<div id="buildRoot">
+    <div class="card"><label>Quiz title</label><input type="text" id="qzTitle" value="${esc(quiz.title)}"><p class="muted" style="margin-top:6px">Total: <b id="qzTotal">${quizPoints(quiz)}</b> points across ${quiz.questions.length} question${quiz.questions.length===1?'':'s'}. Everything you type saves automatically in this browser.</p></div>
+    <div class="two" style="grid-template-columns:260px 1fr">
+      <div class="card"><h3>Questions</h3><div class="qlist" id="qList">${quiz.questions.map((x,i)=>`<div class="qitem ${i===T.qi?'active':''}" data-i="${i}"><b>${i+1}</b><span class="t">${esc(x.scenario)||'<i>(no scenario yet)</i>'}</span><span class="pill">${questionPoints(x)} pt</span></div>`).join('')}</div>
+        <div class="row" style="margin-top:10px"><button class="small" id="qAdd">+ Add question</button><button class="small" id="qUp">↑</button><button class="small" id="qDown">↓</button><button class="small danger" id="qDel">Delete</button></div></div>
+      <div class="card"><h3>Question ${T.qi+1}</h3>
+        <label>Scenario the student reads</label><textarea id="qScenario" placeholder="Example: A heat wave hits Pennsylvania in July. Show what happens in the market for bathing suits.">${esc(q.scenario)}</textarea>
+        <div class="row" style="margin-top:10px"><div><label>Student may move</label><select id="qMv">${[['d','Demand only'],['s','Supply only'],['b','Demand and/or supply']].map(([v,l])=>`<option value="${v}" ${q.mv===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
+        <h3 style="margin-top:14px">Answer key</h3>
+        <p class="muted">Drag the curve(s) the way a correct answer should look. Only the <i>direction</i> is graded (left / right / no shift).</p>
+        <div id="keyGraph"></div>
+        <div class="two" style="margin-top:12px">
+          <div><label>Expected: equilibrium price</label><select id="qExpP">${expOpts(q.expP, auto.p)}</select></div>
+          <div><label>Expected: equilibrium quantity</label><select id="qExpQ">${expOpts(q.expQ, auto.q)}</select></div>
+        </div>
+        <h3 style="margin-top:14px">What students answer</h3>
+        <div class="checks">
+          <label><input type="checkbox" id="qAskP" ${q.askP?'checked':''}> Price question</label>
+          <label><input type="checkbox" id="qAskQ" ${q.askQ?'checked':''}> Quantity question</label>
+          <label><input type="checkbox" id="qAskE" ${q.askE?'checked':''}> Written explanation</label>
+        </div>
+        <div style="margin-top:8px"><label>Explanation prompt</label><input type="text" id="qEp" value="${esc(q.explPrompt)}"></div>
+        <h3 style="margin-top:14px">Points</h3>
+        <div class="row">
+          <div><label>Curve shift</label><input type="number" min="0" step="0.5" id="pShift" value="${q.pts.shift}"></div>
+          <div><label>Price</label><input type="number" min="0" step="0.5" id="pP" value="${q.pts.p}"></div>
+          <div><label>Quantity</label><input type="number" min="0" step="0.5" id="pQ" value="${q.pts.q}"></div>
+          <div><label>Explanation (hand-graded)</label><input type="number" min="0" step="0.5" id="pE" value="${q.pts.e}"></div>
+        </div>
+      </div></div></div>`;
+  const rerenderList = () => { $('#qList').innerHTML = quiz.questions.map((x,i)=>`<div class="qitem ${i===T.qi?'active':''}" data-i="${i}"><b>${i+1}</b><span class="t">${esc(x.scenario)||'<i>(no scenario yet)</i>'}</span><span class="pill">${questionPoints(x)} pt</span></div>`).join(''); $('#qzTotal').textContent = quizPoints(quiz); };
+  const refreshExp = () => { const a = expectedChange(q.key.d, q.key.s); $('#qExpP').innerHTML = expOpts(q.expP, a.p); $('#qExpQ').innerHTML = expOpts(q.expQ, a.q); };
+  mountGraph($('#keyGraph'), q.key, { mv: q.mv, id: 'key', onChange: st => { q.key = st; refreshExp(); saveAll(); } });
+  $('#buildRoot').addEventListener('input', e => {
+    const t = e.target, v = t.value;
+    if (t.id === 'qzTitle'){ quiz.title = v; const o = $('#quizSel option:checked'); if (o) o.textContent = v; }
+    else if (t.id === 'qScenario') q.scenario = v;
+    else if (t.id === 'qEp') q.explPrompt = v;
+    else if (t.id === 'qExpP') q.expP = v;
+    else if (t.id === 'qExpQ') q.expQ = v;
+    else if (t.id === 'qAskP') q.askP = t.checked;
+    else if (t.id === 'qAskQ') q.askQ = t.checked;
+    else if (t.id === 'qAskE') q.askE = t.checked;
+    else if (t.id === 'pShift') q.pts.shift = +v||0;
+    else if (t.id === 'pP') q.pts.p = +v||0;
+    else if (t.id === 'pQ') q.pts.q = +v||0;
+    else if (t.id === 'pE') q.pts.e = +v||0;
+    else if (t.id === 'qMv'){ q.mv = v; if (v==='d') q.key.s = 0; if (v==='s') q.key.d = 0; saveAll(); renderBuild(root); return; }
+    saveAll(); rerenderList();
+  });
+  $('#qList').addEventListener('click', e => { const it = e.target.closest('.qitem'); if (!it) return; T.qi = +it.dataset.i; renderBuild(root); });
+  $('#qAdd').addEventListener('click', ()=>{ quiz.questions.push(newQuestion()); T.qi = quiz.questions.length-1; saveAll(); renderBuild(root); });
+  $('#qDel').addEventListener('click', ()=>{ if (quiz.questions.length===1){ alert('A quiz needs at least one question.'); return; } if(!confirm('Delete this question?')) return; quiz.questions.splice(T.qi,1); T.qi=Math.max(0,T.qi-1); saveAll(); renderBuild(root); });
+  $('#qUp').addEventListener('click', ()=>{ if (T.qi===0) return; [quiz.questions[T.qi-1], quiz.questions[T.qi]] = [quiz.questions[T.qi], quiz.questions[T.qi-1]]; T.qi--; saveAll(); renderBuild(root); });
+  $('#qDown').addEventListener('click', ()=>{ if (T.qi>=quiz.questions.length-1) return; [quiz.questions[T.qi+1], quiz.questions[T.qi]] = [quiz.questions[T.qi], quiz.questions[T.qi+1]]; T.qi++; saveAll(); renderBuild(root); });
+}
+
+/* ---------- Share tab ---------- */
+function renderShare(root){
+  const quiz = curQuiz();
+  const link = studentLink(quiz, T.settings);
+  const problems = [];
+  if (location.protocol === 'file:') problems.push('This page is not hosted online yet, so the link below will not open on student Chromebooks. Upload this file to GitHub Pages (or any web host) and open the hosted copy to generate a working link.');
+  if (!T.settings.scriptUrl) problems.push('No Google Sheet collector is set up (Settings tab). Students can still take the quiz, but they will have to download a file or copy a code to turn in instead of submitting online.');
+  quiz.questions.forEach((q,i)=>{ if(!q.scenario.trim()) problems.push(`Question ${i+1} has no scenario text.`); });
+  root.innerHTML = `<div class="card"><h2>Student link for “${esc(quiz.title)}”</h2>
+    ${problems.map(p=>`<div class="banner">${p}</div>`).join('')}
+    <p class="muted">Post this link in Google Classroom. It contains the questions only — the answer key never leaves this browser. Each student enters their name and period, works the graphs, and submits once.</p>
+    <div class="linkbox" id="linkBox">${esc(link)}</div>
+    <p style="margin-top:10px"><button class="primary" id="cpLink">Copy link</button> <button id="openLink">Preview as a student</button></p>
+    <p class="muted">If you change any question, come back here and post the new link — the old link keeps the old questions. Length: ${link.length} characters.</p></div>
+    <div class="card"><h3>Before quiz day</h3><ol class="steps">
+      <li>Open the link on a student Chromebook once to make sure the school filter allows it.</li>
+      <li>Tell students their work autosaves on their own Chromebook, but they must press <b>Submit</b> at the end.</li>
+      <li>Keep a backup of this quiz: <button class="small" id="expQuiz">Download quiz file (with key)</button></li></ol></div>`;
+  $('#cpLink').addEventListener('click', e=>copyText(link, e.target));
+  $('#openLink').addEventListener('click', ()=>window.open(link, '_blank'));
+  $('#expQuiz').addEventListener('click', ()=>download(`${quiz.title.replace(/[^a-z0-9]+/gi,'_')}_quiz.json`, JSON.stringify(quiz, null, 1)));
+}
+
+/* ---------- Grade tab ---------- */
+function renderGrade(root){
+  const quiz = curQuiz();
+  root.innerHTML = `<div class="card"><h2>Load submissions for “${esc(quiz.title)}”</h2>
+    <div class="row">
+      <button class="primary" id="ldSheet" ${T.settings.scriptUrl&&T.settings.secret?'':'disabled'}>Load from Google Sheet</button>
+      <label style="margin:0"><span class="pill">or</span></label>
+      <button id="ldFilesBtn">Upload answer files…</button><input type="file" id="ldFiles" multiple accept=".json,application/json" class="hidden">
+      <button id="ldCodeBtn">Paste answer code…</button>
+    </div>
+    <div id="ldStatus" class="status muted">${T.settings.scriptUrl&&T.settings.secret?'':'Set up the Google Sheet collector in Settings to load submissions with one click.'}</div></div>
+    <div class="two" style="grid-template-columns:320px 1fr" id="gradeArea"></div>`;
+  $('#ldSheet').addEventListener('click', loadFromSheet);
+  $('#ldFilesBtn').addEventListener('click', ()=>$('#ldFiles').click());
+  $('#ldFiles').addEventListener('change', async e=>{
+    let n=0; for (const f of e.target.files){ try { addSub(JSON.parse(await f.text())); n++; } catch(err){} }
+    setStatus(`${n} file${n===1?'':'s'} loaded.`, 'ok'); drawGradeArea();
+  });
+  $('#ldCodeBtn').addEventListener('click', ()=>{ const c = prompt('Paste the student\'s answer code:'); if(!c) return; try { addSub(b64uDecode(c.trim())); setStatus('Answer code loaded.','ok'); drawGradeArea(); } catch(e){ setStatus('That code could not be read.','bad'); } });
+  drawGradeArea();
+
+  function setStatus(msg, cls){ const s=$('#ldStatus'); s.className='status '+(cls||''); s.textContent=msg; }
+  function addSub(p){
+    if (!p || !p.answers) throw new Error('bad');
+    if (p.quizId !== quiz.id){ setStatus(`Skipped a submission for a different quiz ("${p.quizTitle||'?'}").`, 'bad'); return; }
+    p.sid = p.sid || uid();
+    const i = T.subs.findIndex(s=>s.sid===p.sid); if (i>=0) T.subs[i]=p; else T.subs.push(p);
+  }
+  async function loadFromSheet(){
+    setStatus('Loading…');
+    try {
+      const url = T.settings.scriptUrl + (T.settings.scriptUrl.includes('?')?'&':'?') + 'key=' + encodeURIComponent(T.settings.secret) + '&quiz=' + encodeURIComponent(quiz.id);
+      const r = await fetch(url); const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      T.subs = []; let n=0;
+      for (const row of j.rows||[]){ try { const p = typeof row.payload==='string' ? JSON.parse(row.payload) : row.payload; if (p.quizId===quiz.id){ addSub(p); n++; } } catch(e){} }
+      setStatus(`${n} submission${n===1?'':'s'} loaded from your Google Sheet.`, 'ok');
+    } catch(e){ setStatus('Could not load: ' + e.message + '. Check the script URL and secret key in Settings, and that the script is deployed for "Anyone".', 'bad'); }
+    drawGradeArea();
+  }
+  function gradeFor(sid){ return T.grades[sid] || (T.grades[sid] = { manual: {}, comment: '' }); }
+  function totalFor(sub){
+    let got=0, max=0; quiz.questions.forEach((q,i)=>{ const r = scoreQuestion(q, sub.answers[i]); const g = gradeFor(sub.sid); got += r.auto + (q.askE ? (+g.manual[i]||0) : 0); max += r.max; });
+    return { got: Math.round(got*100)/100, max };
+  }
+  function drawGradeArea(){
+    const area = $('#gradeArea');
+    if (!T.subs.length){ area.innerHTML = '<div class="card" style="grid-column:1/-1"><p class="muted">No submissions loaded yet.</p></div>'; return; }
+    const sorted = [...T.subs].sort((a,b)=>(a.period||'').localeCompare(b.period||'', undefined, {numeric:true}) || (a.name||'').localeCompare(b.name||''));
+    if (!T.selSub || !T.subs.find(s=>s.sid===T.selSub)) T.selSub = sorted[0].sid;
+    area.innerHTML = `<div class="card"><div class="row" style="margin-bottom:8px"><h3 style="margin:0" class="grow">Students (${sorted.length})</h3><button class="small" id="expCsv">Export CSV</button></div>
+      <table><thead><tr><th>Per.</th><th>Name</th><th>Score</th></tr></thead><tbody>${sorted.map(s=>{ const t=totalFor(s); return `<tr data-sid="${s.sid}" class="${s.sid===T.selSub?'sel':''}"><td>${esc(s.period)}</td><td>${esc(s.name)}</td><td>${t.got}/${t.max}</td></tr>`; }).join('')}</tbody></table></div>
+      <div class="card" id="subDetail"></div>`;
+    $('#gradeArea tbody').addEventListener('click', e=>{ const tr=e.target.closest('tr'); if(!tr) return; T.selSub = tr.dataset.sid; drawGradeArea(); });
+    $('#expCsv').addEventListener('click', ()=>{
+      const head = ['Period','Name','Submitted', ...quiz.questions.map((q,i)=>`Q${i+1} (${questionPoints(q)})`), 'Total','Max','Comment'];
+      const rows = sorted.map(s=>{ const g=gradeFor(s.sid); const per = quiz.questions.map((q,i)=>{ const r=scoreQuestion(q,s.answers[i]); return Math.round((r.auto + (q.askE?(+g.manual[i]||0):0))*100)/100; }); const t=totalFor(s);
+        return [s.period, s.name, new Date(s.submittedAt).toLocaleString(), ...per, t.got, t.max, g.comment]; });
+      const csv = [head, ...rows].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+      download(`${quiz.title.replace(/[^a-z0-9]+/gi,'_')}_grades.csv`, csv, 'text/csv');
+    });
+    drawDetail();
+  }
+  function drawDetail(){
+    const sub = T.subs.find(s=>s.sid===T.selSub); const g = gradeFor(sub.sid); const el = $('#subDetail');
+    const t = totalFor(sub);
+    let html = `<div class="row"><div class="grow"><h2 style="margin:0">${esc(sub.name)} <span class="pill">Period ${esc(sub.period)||'—'}</span></h2><p class="muted">Submitted ${new Date(sub.submittedAt).toLocaleString()}</p></div><div class="score" style="font-size:1.3rem" id="dtTotal">${t.got} / ${t.max}</div></div>`;
+    quiz.questions.forEach((q,i)=>{
+      const a = sub.answers[i]||{}; const r = scoreQuestion(q, a);
+      html += `<div class="grade-q"><div class="qnum">Question ${i+1} · ${r.max} pts</div><p class="scenario">${esc(q.scenario)}</p>
+        <div class="two mini"><div><div class="muted">Student's graph</div><div id="gs${i}"></div></div><div><div class="muted">Answer key</div><div id="gk${i}"></div></div></div>
+        <div class="kv" style="margin-top:8px">${r.parts.map(p=>`<div><span class="pill ${p.got>=p.max&&p.max>0?'ok':(p.got>0?'warn':'bad')}">${p.got}/${p.max}</span></div><div><b>${p.name}</b> — <span class="muted">${esc(p.detail)}</span></div>`).join('')}
+        ${q.askE ? `<div><span class="pill">${q.pts.e} pt</span></div><div><b>Explanation</b><div style="background:var(--soft);padding:8px 10px;border-radius:8px;margin:4px 0;white-space:pre-wrap">${esc(a.e)||'<i class="muted">(blank)</i>'}</div>
+          <label style="display:inline">Points: </label><input type="number" min="0" max="${q.pts.e}" step="0.5" data-m="${i}" value="${g.manual[i]??''}" style="width:70px"></div>` : ''}</div></div>`;
+    });
+    html += `<div class="grade-q"><label>Comment for this student (goes in the CSV)</label><textarea id="gComment">${esc(g.comment)}</textarea></div>`;
+    el.innerHTML = html;
+    quiz.questions.forEach((q,i)=>{ mountGraph($('#gs'+i), sub.answers[i], { interactive:false, id:'gs'+i }); mountGraph($('#gk'+i), q.key, { interactive:false, id:'gk'+i }); });
+    el.addEventListener('input', e=>{ const t=e.target; if (t.dataset.m!==undefined) g.manual[t.dataset.m] = t.value===''?'':Math.min(+t.max, Math.max(0,+t.value||0)); else if (t.id==='gComment') g.comment=t.value; saveAll();
+      const tt = totalFor(sub); $('#dtTotal').textContent = `${tt.got} / ${tt.max}`; const tr = $(`#gradeArea tr[data-sid="${sub.sid}"] td:last-child`); if (tr) tr.textContent = `${tt.got}/${tt.max}`; });
+  }
+}
+
+/* ---------- Settings tab ---------- */
+const APPS_SCRIPT = `// Supply & Demand Quiz — Google Sheet collector
+// 1) In a new Google Sheet: Extensions -> Apps Script. Replace everything with this code.
+// 2) Change SECRET to your own private phrase. 3) Deploy -> New deployment -> Web app,
+//    "Execute as: Me", "Who has access: Anyone". Copy the Web app URL into the quiz Settings tab.
+const SECRET = 'change-me-to-a-private-phrase';
+const SHEET = 'Responses';
+
+function sheet_(){
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET);
+  if (!sh){ sh = ss.insertSheet(SHEET); sh.appendRow(['Submitted','Quiz ID','Quiz','Period','Name','Submission ID','Payload']); }
+  return sh;
+}
+function out_(obj){ return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
+
+function doPost(e){
+  try {
+    const d = JSON.parse(e.postData.contents);
+    if (!d || !d.answers || !d.quizId) return out_({ ok:false, error:'bad payload' });
+    const lock = LockService.getScriptLock(); lock.waitLock(10000);
+    sheet_().appendRow([new Date(), d.quizId, d.quizTitle||'', d.period||'', d.name||'', d.sid||'', JSON.stringify(d)]);
+    lock.releaseLock();
+    return out_({ ok:true });
+  } catch(err){ return out_({ ok:false, error:String(err) }); }
+}
+
+function doGet(e){
+  if (!e.parameter.key || e.parameter.key !== SECRET) return out_({ error:'unauthorized' });
+  const quiz = e.parameter.quiz || '';
+  const rows = sheet_().getDataRange().getValues().slice(1)
+    .filter(r => !quiz || r[1] === quiz)
+    .map(r => ({ ts: r[0], payload: r[6] }));
+  return out_({ rows });
+}`;
+function renderSettings(root){
+  root.innerHTML = `<div class="card"><h2>Google Sheet collector (recommended)</h2>
+    <p class="muted">Student submissions post straight into a private Google Sheet in your school Drive. Nothing is stored anywhere else. Set it up once; it works for every quiz you build here.</p>
+    <ol class="steps">
+      <li>Create a new Google Sheet (name it something like <i>SD Quiz Responses</i>).</li>
+      <li>In the sheet, open <b>Extensions → Apps Script</b>, delete the sample code, and paste the code below.</li>
+      <li>Change <code>SECRET</code> to a private phrase only you know.</li>
+      <li>Click <b>Deploy → New deployment</b>, choose type <b>Web app</b>, set <i>Execute as</i> = <b>Me</b> and <i>Who has access</i> = <b>Anyone</b>, then <b>Deploy</b> and authorize it.</li>
+      <li>Copy the <b>Web app URL</b> (ends in <code>/exec</code>) and the secret phrase into the boxes below.</li></ol>
+    <p><button class="small" id="cpScript">Copy Apps Script code</button> <button class="small" id="dlScript">Download as .gs file</button></p>
+    <pre>${esc(APPS_SCRIPT)}</pre>
+    <div class="row" style="margin-top:12px"><div class="grow"><label>Web app URL</label><input type="text" id="sUrl" value="${esc(T.settings.scriptUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></div>
+      <div class="grow"><label>Secret phrase (for loading grades; stays in this browser)</label><input type="password" id="sKey" value="${esc(T.settings.secret)}"></div></div>
+    <p style="margin-top:10px"><button id="testSheet">Test connection</button><span id="sStatus" class="status"></span></p></div>
+    <div class="card"><h2>Hosting this page for students</h2>
+    <ol class="steps">
+      <li>Put this file (<code>index.html</code>) in a GitHub repository and turn on GitHub Pages, the same way your other classroom sites are hosted. Any static web host works.</li>
+      <li>Open the hosted page yourself and use it as your teacher dashboard (the URL with no <code>#q=</code> on the end). Your quizzes and grades are saved in that browser, so use the same computer and browser each time, and download quiz backups.</li>
+      <li>Students never see the teacher dashboard link — post only the student link from the Share tab in Google Classroom.</li></ol></div>
+    <div class="card"><h2>Backup &amp; restore</h2>
+    <p class="muted">Quizzes, answer keys, settings and hand-entered grades live in this browser's storage. Export a backup before clearing browser data or switching computers.</p>
+    <div class="row"><button id="bkExp">Download full backup</button><button id="bkImpBtn">Restore from backup…</button><input type="file" id="bkImp" accept=".json" class="hidden"><button id="quizImpBtn">Import a quiz file…</button><input type="file" id="quizImp" accept=".json" class="hidden"></div>
+    <div id="bkStatus" class="status"></div></div>
+    <div class="card"><h2>Security notes</h2>
+    <p class="muted">The student link carries only the scenario text and settings; the answer key and expected answers are never sent to students. Submissions are locked on the student's Chromebook after one submit, are time-stamped, and go to a Sheet only you can open. The Apps Script URL accepts new submissions from anyone who has the quiz link but only returns submissions when your secret phrase is supplied. Use your school's monitoring tool (GoGuardian, etc.) if you want to lock students to the quiz tab.</p></div>`;
+  $('#sUrl').addEventListener('input', e=>{ T.settings.scriptUrl = e.target.value.trim(); saveAll(); });
+  $('#sKey').addEventListener('input', e=>{ T.settings.secret = e.target.value; saveAll(); });
+  $('#cpScript').addEventListener('click', e=>copyText(APPS_SCRIPT, e.target));
+  $('#dlScript').addEventListener('click', ()=>download('Code.gs', APPS_SCRIPT, 'text/plain'));
+  $('#testSheet').addEventListener('click', async ()=>{
+    const s = $('#sStatus'); s.className='status'; s.textContent=' Testing…';
+    try { const r = await fetch(T.settings.scriptUrl + '?key=' + encodeURIComponent(T.settings.secret)); const j = await r.json();
+      if (j.error) throw new Error(j.error === 'unauthorized' ? 'the secret phrase does not match the script' : j.error);
+      s.className='status ok'; s.textContent=` Connected — ${ (j.rows||[]).length } submission(s) in the sheet.`; }
+    catch(e){ s.className='status bad'; s.textContent=' Could not connect: ' + e.message; }
+  });
+  $('#bkExp').addEventListener('click', ()=>download('sd_quiz_backup.json', JSON.stringify({ quizzes:T.quizzes, settings:T.settings, grades:T.grades }, null, 1)));
+  $('#bkImpBtn').addEventListener('click', ()=>$('#bkImp').click());
+  $('#bkImp').addEventListener('change', async e=>{ try { const b = JSON.parse(await e.target.files[0].text()); if(!b.quizzes) throw 0; if(!confirm('Replace everything in this browser with the backup?')) return; T.quizzes=b.quizzes; T.settings=b.settings||T.settings; T.grades=b.grades||{}; T.cur=T.quizzes[0].id; saveAll(); renderTeacher(); } catch(err){ $('#bkStatus').className='status bad'; $('#bkStatus').textContent='That file is not a valid backup.'; } });
+  $('#quizImpBtn').addEventListener('click', ()=>$('#quizImp').click());
+  $('#quizImp').addEventListener('change', async e=>{ try { const q = JSON.parse(await e.target.files[0].text()); if(!q.questions) throw 0; const i=T.quizzes.findIndex(x=>x.id===q.id); if(i>=0){ if(!confirm(`Replace the existing quiz "${T.quizzes[i].title}"?`)) return; T.quizzes[i]=q; } else T.quizzes.push(q); T.cur=q.id; saveAll(); T.tab='build'; renderTeacher(); } catch(err){ $('#bkStatus').className='status bad'; $('#bkStatus').textContent='That file is not a valid quiz file.'; } });
+}
+
+route();
+</script>
+</body>
+</html>
