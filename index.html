@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Supply & Demand Graph Quiz</title>
+<title>Intro to Business Quiz</title>
 <style>
   :root{
     --bg:#f5f6f8; --card:#ffffff; --ink:#1c2230; --muted:#5b6474; --line:#dfe3ea;
@@ -75,6 +75,10 @@
   .score{font-weight:700}
   .steps li{margin-bottom:6px}
   .mini .graph{max-width:300px}
+  .opts{display:flex;flex-direction:column;gap:6px}
+  .opt{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+  .opt input{margin-top:4px}
+  .opt.right{border-color:#86efac;background:#f0fdf4} .opt.wrong{border-color:#fca5a5;background:#fef2f2}
   footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:24px}
 </style>
 </head>
@@ -262,34 +266,85 @@ function download(name, text, type='application/json'){
   setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
 }
 const DEFAULT_EXPL = 'Explain which curve shifted, why it shifted, and what happened to the equilibrium price and quantity.';
-function newQuestion(){
-  return { id: uid(), scenario: '', mv: 'b', key: { d: 0, s: 0 }, expP: 'auto', expQ: 'auto',
+const QTYPES = { graph: 'Supply & demand graph', match: 'Matching', mc: 'Multiple choice', fr: 'Free response' };
+const qType = q => q.type || 'graph';
+const hasManual = q => qType(q) === 'graph' ? !!q.askE : qType(q) === 'fr';
+function newQuestion(type = 'graph'){
+  const base = { id: uid(), type };
+  if (type === 'match') return Object.assign(base, {
+    prompt: 'Match each example to the factor of production it best represents.',
+    cats: ['Land', 'Labor', 'Capital', 'Entrepreneurship'],
+    items: [ { text: '', cat: 0 }, { text: '', cat: 1 }, { text: '', cat: 2 }, { text: '', cat: 3 } ],
+    pts: { each: 1 } });
+  if (type === 'mc') return Object.assign(base, { prompt: '', opts: ['', '', '', ''], correct: 0, pts: { mc: 1 } });
+  if (type === 'fr') return Object.assign(base, { prompt: '', model: '', pts: { e: 3 } });
+  return Object.assign(base, { scenario: '', mv: 'b', key: { d: 0, s: 0 }, expP: 'auto', expQ: 'auto',
            askP: true, askQ: true, askE: true, explPrompt: DEFAULT_EXPL,
-           pts: { shift: 2, p: 1, q: 1, e: 2 } };
+           pts: { shift: 2, p: 1, q: 1, e: 2 } });
 }
+const qText = q => qType(q) === 'graph' ? q.scenario : q.prompt;
 function newQuiz(){
   return { id: uid(), title: 'Supply & Demand Quiz', questions: [newQuestion()], created: Date.now() };
 }
 /* A ready-to-use sample quiz for first launch. */
 function sampleQuiz(){
   const mk = (scenario, mv, d, s) => Object.assign(newQuestion(), { scenario, mv, key: { d, s } });
+  const match = newQuestion('match');
+  match.items = [ { text: 'The soil on a farm in Lancaster County', cat: 0 }, { text: 'A barista making lattes at a coffee shop', cat: 1 },
+    { text: 'The espresso machine the coffee shop bought', cat: 2 }, { text: 'The person who took the risk to open the coffee shop', cat: 3 },
+    { text: 'A delivery van owned by a bakery', cat: 2 }, { text: 'Natural gas pumped from under Pennsylvania', cat: 0 } ];
+  const mc = Object.assign(newQuestion('mc'), { prompt: 'Which of the following would most likely cause the demand curve for umbrellas to shift to the right?',
+    opts: ['A drop in the price of umbrellas', 'A forecast calling for a rainy month', 'A new factory that makes umbrellas cheaper to produce', 'A tax on umbrella makers'], correct: 1 });
+  const fr = Object.assign(newQuestion('fr'), { prompt: 'In your own words, explain the difference between a change in quantity demanded and a change in demand. Give one example of each.',
+    model: 'Quantity demanded changes because the price of the good itself changes (movement along the curve). Demand changes because of something other than price — income, tastes, prices of related goods, expectations, number of buyers (the whole curve shifts).' });
   return { id: uid(), title: 'Supply & Demand Graph Quiz (sample)', created: Date.now(), questions: [
     mk('It is the end of summer in Pennsylvania and a clothing store still has a lot of bathing suits it has not sold. Show what happens in the market for bathing suits as summer ends.', 'd', -2, 0),
     mk('A new factory makes it much cheaper to produce sneakers. Show what happens in the market for sneakers.', 's', 0, 2),
-    mk('A popular influencer starts wearing a certain brand of hoodie, and at the same time the cost of the fabric used to make it goes up. Show what happens in the market for that hoodie.', 'b', 2, -2)
+    match, mc, fr
   ] };
 }
 function resolvedExpected(q){
   const auto = expectedChange(q.key.d, q.key.s);
   return { p: q.expP === 'auto' ? auto.p : q.expP, q: q.expQ === 'auto' ? auto.q : q.expQ };
 }
-function questionPoints(q){ return (q.pts.shift||0) + (q.askP?q.pts.p||0:0) + (q.askQ?q.pts.q||0:0) + (q.askE?q.pts.e||0:0); }
+function questionPoints(q){
+  switch (qType(q)){
+    case 'match': return q.items.length * (q.pts.each||0);
+    case 'mc': return q.pts.mc||0;
+    case 'fr': return q.pts.e||0;
+    default: return (q.pts.shift||0) + (q.askP?q.pts.p||0:0) + (q.askQ?q.pts.q||0:0) + (q.askE?q.pts.e||0:0);
+  }
+}
 function quizPoints(quiz){ return quiz.questions.reduce((a,q)=>a+questionPoints(q),0); }
+/* Points as seen from the student payload (no key needed). */
+function payloadPoints(q){
+  switch (q.ty||'graph'){
+    case 'match': return q.items.length * (q.pts.each||0);
+    case 'mc': return q.pts.mc||0;
+    case 'fr': return q.pts.e||0;
+    default: return (q.pts.shift||0)+(q.ask[0]?q.pts.p||0:0)+(q.ask[1]?q.pts.q||0:0)+(q.ask[2]?q.pts.e||0:0);
+  }
+}
+function blankAnswer(q){
+  switch (q.ty||'graph'){
+    case 'match': return { m: q.items.map(()=>'') };
+    case 'mc': return { c: '' };
+    case 'fr': return { e: '' };
+    default: return { d:0, s:0, p:'', q:'', e:'' };
+  }
+}
 
-/* Student payload: questions only — no answer key, no expected answers. */
+/* Student payload: questions only — no answer key, no expected answers, no model answers. */
 function studentPayload(quiz, settings){
-  return { v: 1, id: quiz.id, t: quiz.title, u: settings.scriptUrl || '',
-    q: quiz.questions.map(q => ({ s: q.scenario, mv: q.mv, ask: [q.askP?1:0, q.askQ?1:0, q.askE?1:0], ep: q.explPrompt, pts: q.pts })) };
+  return { v: 2, id: quiz.id, t: quiz.title, u: settings.scriptUrl || '',
+    q: quiz.questions.map(q => {
+      switch (qType(q)){
+        case 'match': return { ty:'match', s: q.prompt, cats: q.cats, items: q.items.map(i=>i.text), pts: q.pts };
+        case 'mc': return { ty:'mc', s: q.prompt, opts: q.opts, pts: q.pts };
+        case 'fr': return { ty:'fr', s: q.prompt, pts: q.pts };
+        default: return { ty:'graph', s: q.scenario, mv: q.mv, ask: [q.askP?1:0, q.askQ?1:0, q.askE?1:0], ep: q.explPrompt, pts: q.pts };
+      }
+    }) };
 }
 function studentLink(quiz, settings){
   return location.origin + location.pathname + '#q=' + b64uEncode(studentPayload(quiz, settings));
@@ -300,7 +355,21 @@ function studentLink(quiz, settings){
    ============================================================ */
 function scoreQuestion(q, ans){
   ans = ans || {}; const res = { parts: [], auto: 0, max: questionPoints(q) };
-  // shift
+  const t = qType(q);
+  if (t === 'match'){
+    const m = ans.m || []; let correct = 0; const wrong = [];
+    q.items.forEach((it, j) => { if (String(m[j]) === String(it.cat)) correct++; else wrong.push(`"${it.text}" → ${m[j]===''||m[j]===undefined?'(blank)':q.cats[m[j]]} (key: ${q.cats[it.cat]})`); });
+    const got = Math.round(correct * (q.pts.each||0) * 100)/100; res.auto = got;
+    res.parts.push({ name: 'Matching', got, max: res.max, detail: `${correct} of ${q.items.length} correct` + (wrong.length ? ' · ' + wrong.join(' · ') : '') });
+    return res;
+  }
+  if (t === 'mc'){
+    const ok = String(ans.c) === String(q.correct); const got = ok ? (q.pts.mc||0) : 0; res.auto = got;
+    res.parts.push({ name: 'Multiple choice', got, max: res.max, detail: `student: ${ans.c===''||ans.c===undefined?'(blank)':q.opts[ans.c]} · key: ${q.opts[q.correct]}` });
+    return res;
+  }
+  if (t === 'fr') return res;
+  // graph
   const curves = q.mv === 'b' ? ['d','s'] : [q.mv];
   let correct = 0;
   for (const k of curves){ if (Math.sign(ans[k]||0) === Math.sign(q.key[k]||0)) correct++; }
@@ -332,9 +401,10 @@ window.addEventListener('hashchange', route);
    ============================================================ */
 function renderStudent(qz){
   const key = 'sdq.student.' + qz.id;
-  const saved = LS.get(key, { name:'', period:'', answers: qz.q.map(()=>({d:0,s:0,p:'',q:'',e:''})), submitted:null });
-  if (saved.answers.length !== qz.q.length) saved.answers = qz.q.map(()=>({d:0,s:0,p:'',q:'',e:''}));
-  const total = qz.q.reduce((a,q)=>a+(q.pts.shift||0)+(q.ask[0]?q.pts.p||0:0)+(q.ask[1]?q.pts.q||0:0)+(q.ask[2]?q.pts.e||0:0),0);
+  const saved = LS.get(key, { name:'', period:'', answers: qz.q.map(blankAnswer), submitted:null });
+  if (saved.answers.length !== qz.q.length) saved.answers = qz.q.map(blankAnswer);
+  const total = qz.q.reduce((a,q)=>a+payloadPoints(q),0);
+  const hasGraph = qz.q.some(q => (q.ty||'graph') === 'graph');
 
   if (saved.submitted){ return renderSubmitted(qz, saved); }
 
@@ -343,37 +413,57 @@ function renderStudent(qz){
     <p class="muted">${qz.q.length} question${qz.q.length===1?'':'s'} · ${total} points</p>
     <div class="row"><div class="grow"><label>Your name</label><input type="text" id="stName" value="${esc(saved.name)}" placeholder="First and last name" autocomplete="off"></div>
     <div style="flex:0 0 140px"><label>Period</label><input type="text" id="stPeriod" value="${esc(saved.period)}" placeholder="e.g. 3" autocomplete="off"></div></div>
-    <p class="muted" style="margin-top:10px"><b>How to answer:</b> drag a curve left or right on the graph (or use the ◀ ▶ buttons). The dashed line shows where the curve started. Your work saves on this Chromebook as you go; press <b>Submit</b> at the bottom when you are finished.</p></div>`;
+    <p class="muted" style="margin-top:10px"><b>How to answer:</b> ${hasGraph ? 'for graph questions, drag a curve left or right (or use the ◀ ▶ buttons); the dashed line shows where the curve started. ' : ''}Your work saves on this Chromebook as you go; press <b>Submit</b> at the bottom when you are finished.</p></div>`;
   qz.q.forEach((q, i) => {
-    const mvText = q.mv === 'b' ? 'You may move demand, supply, or both.' : (q.mv === 'd' ? 'You may move the demand curve.' : 'You may move the supply curve.');
-    html += `<div class="card qcard"><div class="qnum">Question ${i+1}</div><p class="scenario">${esc(q.s)}</p>
-      <p class="muted">${mvText}</p>
-      <div class="two"><div><div id="sg${i}"></div></div><div>`;
-    if (q.ask[0]) html += `<label>What happens to the equilibrium <b>price</b>? (${q.pts.p} pt)</label><select data-q="${i}" data-f="p"><option value="">Choose…</option>${changeOpts(saved.answers[i].p)}</select><br><br>`;
-    if (q.ask[1]) html += `<label>What happens to the equilibrium <b>quantity</b>? (${q.pts.q} pt)</label><select data-q="${i}" data-f="q"><option value="">Choose…</option>${changeOpts(saved.answers[i].q)}</select><br><br>`;
-    if (q.ask[2]) html += `<label>${esc(q.ep||DEFAULT_EXPL)} (${q.pts.e} pt)</label><textarea data-q="${i}" data-f="e" placeholder="Type your explanation…">${esc(saved.answers[i].e)}</textarea>`;
-    html += `</div></div></div>`;
+    const a = saved.answers[i]; const ty = q.ty || 'graph'; const pts = payloadPoints(q);
+    html += `<div class="card qcard"><div class="qnum">Question ${i+1} · ${pts} pt${pts===1?'':'s'}</div><p class="scenario">${esc(q.s)}</p>`;
+    if (ty === 'match'){
+      html += `<p class="muted">Choose the best match for each item.</p><table><tbody>${q.items.map((it,j)=>`<tr><td style="width:60%">${esc(it)}</td><td><select data-q="${i}" data-f="m" data-j="${j}"><option value="">Choose…</option>${q.cats.map((c,ci)=>`<option value="${ci}" ${String(a.m[j])===String(ci)?'selected':''}>${esc(c)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>`;
+    } else if (ty === 'mc'){
+      html += `<div class="opts">${q.opts.map((o,oi)=>!o.trim()?'':`<label class="opt"><input type="radio" name="mc${i}" value="${oi}" data-q="${i}" data-f="c" ${String(a.c)===String(oi)?'checked':''}> <span>${String.fromCharCode(65+oi)}. ${esc(o)}</span></label>`).join('')}</div>`;
+    } else if (ty === 'fr'){
+      html += `<textarea data-q="${i}" data-f="e" placeholder="Type your answer…" style="min-height:110px">${esc(a.e)}</textarea>`;
+    } else {
+      const mvText = q.mv === 'b' ? 'You may move demand, supply, or both.' : (q.mv === 'd' ? 'You may move the demand curve.' : 'You may move the supply curve.');
+      html += `<p class="muted">${mvText}</p><div class="two"><div><div id="sg${i}"></div></div><div>`;
+      if (q.ask[0]) html += `<label>What happens to the equilibrium <b>price</b>? (${q.pts.p} pt)</label><select data-q="${i}" data-f="p"><option value="">Choose…</option>${changeOpts(a.p)}</select><br><br>`;
+      if (q.ask[1]) html += `<label>What happens to the equilibrium <b>quantity</b>? (${q.pts.q} pt)</label><select data-q="${i}" data-f="q"><option value="">Choose…</option>${changeOpts(a.q)}</select><br><br>`;
+      if (q.ask[2]) html += `<label>${esc(q.ep||DEFAULT_EXPL)} (${q.pts.e} pt)</label><textarea data-q="${i}" data-f="e" placeholder="Type your explanation…">${esc(a.e)}</textarea>`;
+      html += `</div></div>`;
+    }
+    html += `</div>`;
   });
   html += `<div class="card"><button class="primary" id="stSubmit">Submit quiz</button> <span class="muted">You can only submit once.</span><div id="stStatus" class="status"></div></div>`;
   app.innerHTML = html;
 
   const persist = () => LS.set(key, saved);
-  qz.q.forEach((q, i) => mountGraph($('#sg'+i), { d: saved.answers[i].d, s: saved.answers[i].s }, { mv: q.mv, onChange: st => { saved.answers[i].d = st.d; saved.answers[i].s = st.s; persist(); } }));
-  app.addEventListener('input', e => {
+  qz.q.forEach((q, i) => { if ((q.ty||'graph') === 'graph') mountGraph($('#sg'+i), { d: saved.answers[i].d, s: saved.answers[i].s }, { mv: q.mv, onChange: st => { saved.answers[i].d = st.d; saved.answers[i].s = st.s; persist(); } }); });
+  const onInput = e => {
     const t = e.target;
     if (t.id === 'stName') saved.name = t.value;
     else if (t.id === 'stPeriod') saved.period = t.value;
-    else if (t.dataset.q !== undefined) saved.answers[+t.dataset.q][t.dataset.f] = t.value;
+    else if (t.dataset.q !== undefined){
+      const a = saved.answers[+t.dataset.q];
+      if (t.dataset.f === 'm') a.m[+t.dataset.j] = t.value;
+      else a[t.dataset.f] = t.value;
+    }
     persist();
-  });
+  };
+  app.addEventListener('input', onInput);
+  app.addEventListener('change', e => { if (e.target.type === 'radio') onInput(e); });
   $('#stSubmit').addEventListener('click', async () => {
     const st = $('#stStatus');
     if (!saved.name.trim()) { st.className='status bad'; st.textContent='Please enter your name before submitting.'; $('#stName').focus(); return; }
     const missing = [];
-    qz.q.forEach((q,i)=>{ const a=saved.answers[i]; if ((q.ask[0]&&!a.p)||(q.ask[1]&&!a.q)||(q.ask[2]&&!a.e.trim())) missing.push(i+1); });
+    qz.q.forEach((q,i)=>{ const a=saved.answers[i]; const ty=q.ty||'graph'; let inc=false;
+      if (ty==='match') inc = a.m.some(v=>v==='');
+      else if (ty==='mc') inc = a.c==='';
+      else if (ty==='fr') inc = !a.e.trim();
+      else inc = (q.ask[0]&&!a.p)||(q.ask[1]&&!a.q)||(q.ask[2]&&!a.e.trim());
+      if (inc) missing.push(i+1); });
     if (missing.length && !confirm(`Question${missing.length>1?'s':''} ${missing.join(', ')} ${missing.length>1?'are':'is'} not finished. Submit anyway?`)) return;
     if (!confirm('Submit your quiz now? You will not be able to change your answers.')) return;
-    const payload = { v:1, sid: uid(), quizId: qz.id, quizTitle: qz.t, name: saved.name.trim(), period: saved.period.trim(),
+    const payload = { v:2, sid: uid(), quizId: qz.id, quizTitle: qz.t, name: saved.name.trim(), period: saved.period.trim(),
       submittedAt: new Date().toISOString(), answers: saved.answers };
     $('#stSubmit').disabled = true; st.className='status'; st.textContent='Submitting…';
     let sent = false, err = '';
@@ -446,17 +536,15 @@ function renderTeacher(){
 function renderBuild(root){
   const quiz = curQuiz();
   if (T.qi >= quiz.questions.length) T.qi = Math.max(0, quiz.questions.length-1);
-  const q = quiz.questions[T.qi];
-  const auto = expectedChange(q.key.d, q.key.s);
-  const expOpts = (sel, autoVal) => [['auto',`Auto from key (${CHANGE_LABEL[autoVal]})`],['up','Increases'],['down','Decreases'],['same','Stays the same'],['indet','Cannot be determined']]
-    .map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('');
-  root.innerHTML = `<div id="buildRoot">
-    <div class="card"><label>Quiz title</label><input type="text" id="qzTitle" value="${esc(quiz.title)}"><p class="muted" style="margin-top:6px">Total: <b id="qzTotal">${quizPoints(quiz)}</b> points across ${quiz.questions.length} question${quiz.questions.length===1?'':'s'}. Everything you type saves automatically in this browser.</p></div>
-    <div class="two" style="grid-template-columns:260px 1fr">
-      <div class="card"><h3>Questions</h3><div class="qlist" id="qList">${quiz.questions.map((x,i)=>`<div class="qitem ${i===T.qi?'active':''}" data-i="${i}"><b>${i+1}</b><span class="t">${esc(x.scenario)||'<i>(no scenario yet)</i>'}</span><span class="pill">${questionPoints(x)} pt</span></div>`).join('')}</div>
-        <div class="row" style="margin-top:10px"><button class="small" id="qAdd">+ Add question</button><button class="small" id="qUp">↑</button><button class="small" id="qDown">↓</button><button class="small danger" id="qDel">Delete</button></div></div>
-      <div class="card"><h3>Question ${T.qi+1}</h3>
-        <label>Scenario the student reads</label><textarea id="qScenario" placeholder="Example: A heat wave hits Pennsylvania in July. Show what happens in the market for bathing suits.">${esc(q.scenario)}</textarea>
+  const q = quiz.questions[T.qi]; const ty = qType(q);
+  const listHTML = () => quiz.questions.map((x,i)=>`<div class="qitem ${i===T.qi?'active':''}" data-i="${i}"><b>${i+1}</b><span class="t">${esc(qText(x))||'<i>(empty)</i>'}</span><span class="pill">${QTYPES[qType(x)].split(' ')[0]}</span><span class="pill">${questionPoints(x)} pt</span></div>`).join('');
+
+  let editor = '';
+  if (ty === 'graph'){
+    const auto = expectedChange(q.key.d, q.key.s);
+    const expOpts = (sel, autoVal) => [['auto',`Auto from key (${CHANGE_LABEL[autoVal]})`],['up','Increases'],['down','Decreases'],['same','Stays the same'],['indet','Cannot be determined']]
+      .map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('');
+    editor = `<label>Scenario the student reads</label><textarea id="qScenario" placeholder="Example: A heat wave hits Pennsylvania in July. Show what happens in the market for bathing suits.">${esc(q.scenario)}</textarea>
         <div class="row" style="margin-top:10px"><div><label>Student may move</label><select id="qMv">${[['d','Demand only'],['s','Supply only'],['b','Demand and/or supply']].map(([v,l])=>`<option value="${v}" ${q.mv===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
         <h3 style="margin-top:14px">Answer key</h3>
         <p class="muted">Drag the curve(s) the way a correct answer should look. Only the <i>direction</i> is graded (left / right / no shift).</p>
@@ -478,15 +566,58 @@ function renderBuild(root){
           <div><label>Price</label><input type="number" min="0" step="0.5" id="pP" value="${q.pts.p}"></div>
           <div><label>Quantity</label><input type="number" min="0" step="0.5" id="pQ" value="${q.pts.q}"></div>
           <div><label>Explanation (hand-graded)</label><input type="number" min="0" step="0.5" id="pE" value="${q.pts.e}"></div>
-        </div>
-      </div></div></div>`;
-  const rerenderList = () => { $('#qList').innerHTML = quiz.questions.map((x,i)=>`<div class="qitem ${i===T.qi?'active':''}" data-i="${i}"><b>${i+1}</b><span class="t">${esc(x.scenario)||'<i>(no scenario yet)</i>'}</span><span class="pill">${questionPoints(x)} pt</span></div>`).join(''); $('#qzTotal').textContent = quizPoints(quiz); };
-  const refreshExp = () => { const a = expectedChange(q.key.d, q.key.s); $('#qExpP').innerHTML = expOpts(q.expP, a.p); $('#qExpQ').innerHTML = expOpts(q.expQ, a.q); };
-  mountGraph($('#keyGraph'), q.key, { mv: q.mv, id: 'key', onChange: st => { q.key = st; refreshExp(); saveAll(); } });
+        </div>`;
+  } else if (ty === 'match'){
+    editor = `<label>Instructions the student reads</label><textarea id="qPrompt">${esc(q.prompt)}</textarea>
+        <div style="margin-top:10px"><label>Categories students choose from (separate with commas)</label><input type="text" id="qCats" value="${esc(q.cats.join(', '))}"></div>
+        <h3 style="margin-top:14px">Items to match</h3>
+        <p class="muted">Type each example and pick its correct category. Students see the items in this order with a dropdown of the categories.</p>
+        <table><thead><tr><th>Item</th><th style="width:200px">Correct category</th><th></th></tr></thead><tbody id="mItems">${q.items.map((it,j)=>`<tr>
+          <td><input type="text" data-mi="${j}" value="${esc(it.text)}" placeholder="e.g. A farmer's tractor"></td>
+          <td><select data-mc="${j}">${q.cats.map((c,ci)=>`<option value="${ci}" ${it.cat===ci?'selected':''}>${esc(c)}</option>`).join('')}</select></td>
+          <td><button class="small danger" data-mdel="${j}" title="Remove">✕</button></td></tr>`).join('')}</tbody></table>
+        <p style="margin-top:8px"><button class="small" id="mAdd">+ Add item</button></p>
+        <h3 style="margin-top:14px">Points</h3>
+        <div class="row"><div><label>Per item</label><input type="number" min="0" step="0.5" id="pEach" value="${q.pts.each}"></div><div class="muted" style="align-self:end">= ${questionPoints(q)} points for ${q.items.length} items</div></div>`;
+  } else if (ty === 'mc'){
+    editor = `<label>Question the student reads</label><textarea id="qPrompt">${esc(q.prompt)}</textarea>
+        <h3 style="margin-top:14px">Answer choices</h3>
+        <p class="muted">Select the radio button next to the correct answer.</p>
+        <table><tbody id="mcOpts">${q.opts.map((o,oi)=>`<tr>
+          <td style="width:40px"><input type="radio" name="mcCorrect" value="${oi}" ${q.correct===oi?'checked':''} title="Correct answer"></td>
+          <td><div class="row"><b>${String.fromCharCode(65+oi)}.</b><input type="text" class="grow" data-oi="${oi}" value="${esc(o)}" placeholder="Answer choice"></div></td>
+          <td style="width:50px"><button class="small danger" data-odel="${oi}" title="Remove">✕</button></td></tr>`).join('')}</tbody></table>
+        <p style="margin-top:8px"><button class="small" id="oAdd" ${q.opts.length>=6?'disabled':''}>+ Add choice</button></p>
+        <h3 style="margin-top:14px">Points</h3>
+        <div class="row"><div><label>Points</label><input type="number" min="0" step="0.5" id="pMc" value="${q.pts.mc}"></div></div>`;
+  } else {
+    editor = `<label>Question the student reads</label><textarea id="qPrompt">${esc(q.prompt)}</textarea>
+        <div style="margin-top:10px"><label>Model answer / grading notes (only you see this, shown next to each response while grading)</label><textarea id="qModel">${esc(q.model)}</textarea></div>
+        <h3 style="margin-top:14px">Points</h3>
+        <div class="row"><div><label>Points (hand-graded)</label><input type="number" min="0" step="0.5" id="pE" value="${q.pts.e}"></div></div>`;
+  }
+
+  root.innerHTML = `<div id="buildRoot">
+    <div class="card"><label>Quiz title</label><input type="text" id="qzTitle" value="${esc(quiz.title)}"><p class="muted" style="margin-top:6px">Total: <b id="qzTotal">${quizPoints(quiz)}</b> points across ${quiz.questions.length} question${quiz.questions.length===1?'':'s'}. Everything you type saves automatically in this browser.</p></div>
+    <div class="two" style="grid-template-columns:280px 1fr">
+      <div class="card"><h3>Questions</h3><div class="qlist" id="qList">${listHTML()}</div>
+        <div style="margin-top:12px"><label>Add a question</label><div class="row"><select id="qAddType" style="width:auto;flex:1">${Object.entries(QTYPES).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select><button class="small primary" id="qAdd">+ Add</button></div></div>
+        <div class="row" style="margin-top:10px"><button class="small" id="qUp">↑ Move up</button><button class="small" id="qDown">↓ Move down</button><button class="small danger" id="qDel">Delete</button></div></div>
+      <div class="card"><div class="row"><h3 style="margin:0" class="grow">Question ${T.qi+1}</h3><span class="pill">${QTYPES[ty]}</span></div><div style="margin-top:10px">${editor}</div></div></div></div>`;
+
+  const rerenderList = () => { $('#qList').innerHTML = listHTML(); $('#qzTotal').textContent = quizPoints(quiz); };
+  if (ty === 'graph'){
+    const expOpts = (sel, autoVal) => [['auto',`Auto from key (${CHANGE_LABEL[autoVal]})`],['up','Increases'],['down','Decreases'],['same','Stays the same'],['indet','Cannot be determined']]
+      .map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('');
+    const refreshExp = () => { const a = expectedChange(q.key.d, q.key.s); $('#qExpP').innerHTML = expOpts(q.expP, a.p); $('#qExpQ').innerHTML = expOpts(q.expQ, a.q); };
+    mountGraph($('#keyGraph'), q.key, { mv: q.mv, id: 'key', onChange: st => { q.key = st; refreshExp(); saveAll(); } });
+  }
   $('#buildRoot').addEventListener('input', e => {
     const t = e.target, v = t.value;
     if (t.id === 'qzTitle'){ quiz.title = v; const o = $('#quizSel option:checked'); if (o) o.textContent = v; }
     else if (t.id === 'qScenario') q.scenario = v;
+    else if (t.id === 'qPrompt') q.prompt = v;
+    else if (t.id === 'qModel') q.model = v;
     else if (t.id === 'qEp') q.explPrompt = v;
     else if (t.id === 'qExpP') q.expP = v;
     else if (t.id === 'qExpQ') q.expQ = v;
@@ -497,11 +628,26 @@ function renderBuild(root){
     else if (t.id === 'pP') q.pts.p = +v||0;
     else if (t.id === 'pQ') q.pts.q = +v||0;
     else if (t.id === 'pE') q.pts.e = +v||0;
+    else if (t.id === 'pMc') q.pts.mc = +v||0;
+    else if (t.id === 'pEach') q.pts.each = +v||0;
     else if (t.id === 'qMv'){ q.mv = v; if (v==='d') q.key.s = 0; if (v==='s') q.key.d = 0; saveAll(); renderBuild(root); return; }
+    else if (t.dataset.mi !== undefined) q.items[+t.dataset.mi].text = v;
+    else if (t.dataset.mc !== undefined) q.items[+t.dataset.mc].cat = +v;
+    else if (t.dataset.oi !== undefined) q.opts[+t.dataset.oi] = v;
+    else if (t.name === 'mcCorrect') q.correct = +v;
     saveAll(); rerenderList();
   });
+  // Category list edits re-render on change (not every keystroke) so dropdowns stay in sync.
+  $('#qCats')?.addEventListener('change', e => { q.cats = e.target.value.split(',').map(s=>s.trim()).filter(Boolean); if (!q.cats.length) q.cats=['Land','Labor','Capital','Entrepreneurship']; q.items.forEach(it=>{ if (it.cat >= q.cats.length) it.cat = 0; }); saveAll(); renderBuild(root); });
+  $('#buildRoot').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.mdel !== undefined){ if (q.items.length<=1) return; q.items.splice(+b.dataset.mdel,1); saveAll(); renderBuild(root); }
+    else if (b.dataset.odel !== undefined){ if (q.opts.length<=2) return; q.opts.splice(+b.dataset.odel,1); if (q.correct>=q.opts.length) q.correct=0; saveAll(); renderBuild(root); }
+    else if (b.id === 'mAdd'){ q.items.push({ text:'', cat:0 }); saveAll(); renderBuild(root); setTimeout(()=>$(`[data-mi="${q.items.length-1}"]`)?.focus(),0); }
+    else if (b.id === 'oAdd'){ if (q.opts.length<6){ q.opts.push(''); saveAll(); renderBuild(root); } }
+  });
   $('#qList').addEventListener('click', e => { const it = e.target.closest('.qitem'); if (!it) return; T.qi = +it.dataset.i; renderBuild(root); });
-  $('#qAdd').addEventListener('click', ()=>{ quiz.questions.push(newQuestion()); T.qi = quiz.questions.length-1; saveAll(); renderBuild(root); });
+  $('#qAdd').addEventListener('click', ()=>{ quiz.questions.push(newQuestion($('#qAddType').value)); T.qi = quiz.questions.length-1; saveAll(); renderBuild(root); });
   $('#qDel').addEventListener('click', ()=>{ if (quiz.questions.length===1){ alert('A quiz needs at least one question.'); return; } if(!confirm('Delete this question?')) return; quiz.questions.splice(T.qi,1); T.qi=Math.max(0,T.qi-1); saveAll(); renderBuild(root); });
   $('#qUp').addEventListener('click', ()=>{ if (T.qi===0) return; [quiz.questions[T.qi-1], quiz.questions[T.qi]] = [quiz.questions[T.qi], quiz.questions[T.qi-1]]; T.qi--; saveAll(); renderBuild(root); });
   $('#qDown').addEventListener('click', ()=>{ if (T.qi>=quiz.questions.length-1) return; [quiz.questions[T.qi+1], quiz.questions[T.qi]] = [quiz.questions[T.qi], quiz.questions[T.qi+1]]; T.qi++; saveAll(); renderBuild(root); });
@@ -514,7 +660,7 @@ function renderShare(root){
   const problems = [];
   if (location.protocol === 'file:') problems.push('This page is not hosted online yet, so the link below will not open on student Chromebooks. Upload this file to GitHub Pages (or any web host) and open the hosted copy to generate a working link.');
   if (!T.settings.scriptUrl) problems.push('No Google Sheet collector is set up (Settings tab). Students can still take the quiz, but they will have to download a file or copy a code to turn in instead of submitting online.');
-  quiz.questions.forEach((q,i)=>{ if(!q.scenario.trim()) problems.push(`Question ${i+1} has no scenario text.`); });
+  quiz.questions.forEach((q,i)=>{ if(!(qText(q)||'').trim()) problems.push(`Question ${i+1} has no text yet.`); if(qType(q)==='match'&&q.items.some(it=>!it.text.trim())) problems.push(`Question ${i+1} has a blank matching item.`); if(qType(q)==='mc'&&q.opts.some(o=>!o.trim())) problems.push(`Question ${i+1} has a blank answer choice.`); });
   root.innerHTML = `<div class="card"><h2>Student link for “${esc(quiz.title)}”</h2>
     ${problems.map(p=>`<div class="banner">${p}</div>`).join('')}
     <p class="muted">Post this link in Google Classroom. It contains the questions only — the answer key never leaves this browser. Each student enters their name and period, works the graphs, and submits once.</p>
@@ -572,7 +718,7 @@ function renderGrade(root){
   }
   function gradeFor(sid){ return T.grades[sid] || (T.grades[sid] = { manual: {}, comment: '' }); }
   function totalFor(sub){
-    let got=0, max=0; quiz.questions.forEach((q,i)=>{ const r = scoreQuestion(q, sub.answers[i]); const g = gradeFor(sub.sid); got += r.auto + (q.askE ? (+g.manual[i]||0) : 0); max += r.max; });
+    let got=0, max=0; quiz.questions.forEach((q,i)=>{ const r = scoreQuestion(q, sub.answers[i]); const g = gradeFor(sub.sid); got += r.auto + (hasManual(q) ? (+g.manual[i]||0) : 0); max += r.max; });
     return { got: Math.round(got*100)/100, max };
   }
   function drawGradeArea(){
@@ -586,7 +732,7 @@ function renderGrade(root){
     $('#gradeArea tbody').addEventListener('click', e=>{ const tr=e.target.closest('tr'); if(!tr) return; T.selSub = tr.dataset.sid; drawGradeArea(); });
     $('#expCsv').addEventListener('click', ()=>{
       const head = ['Period','Name','Submitted', ...quiz.questions.map((q,i)=>`Q${i+1} (${questionPoints(q)})`), 'Total','Max','Comment'];
-      const rows = sorted.map(s=>{ const g=gradeFor(s.sid); const per = quiz.questions.map((q,i)=>{ const r=scoreQuestion(q,s.answers[i]); return Math.round((r.auto + (q.askE?(+g.manual[i]||0):0))*100)/100; }); const t=totalFor(s);
+      const rows = sorted.map(s=>{ const g=gradeFor(s.sid); const per = quiz.questions.map((q,i)=>{ const r=scoreQuestion(q,s.answers[i]); return Math.round((r.auto + (hasManual(q)?(+g.manual[i]||0):0))*100)/100; }); const t=totalFor(s);
         return [s.period, s.name, new Date(s.submittedAt).toLocaleString(), ...per, t.got, t.max, g.comment]; });
       const csv = [head, ...rows].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
       download(`${quiz.title.replace(/[^a-z0-9]+/gi,'_')}_grades.csv`, csv, 'text/csv');
@@ -596,18 +742,32 @@ function renderGrade(root){
   function drawDetail(){
     const sub = T.subs.find(s=>s.sid===T.selSub); const g = gradeFor(sub.sid); const el = $('#subDetail');
     const t = totalFor(sub);
+    const box = s => `<div style="background:var(--soft);padding:8px 10px;border-radius:8px;margin:4px 0;white-space:pre-wrap">${esc(s)||'<i class="muted">(blank)</i>'}</div>`;
+    const manualBox = (i, max) => `<label style="display:inline">Points: </label><input type="number" min="0" max="${max}" step="0.5" data-m="${i}" value="${g.manual[i]??''}" style="width:70px">`;
     let html = `<div class="row"><div class="grow"><h2 style="margin:0">${esc(sub.name)} <span class="pill">Period ${esc(sub.period)||'—'}</span></h2><p class="muted">Submitted ${new Date(sub.submittedAt).toLocaleString()}</p></div><div class="score" style="font-size:1.3rem" id="dtTotal">${t.got} / ${t.max}</div></div>`;
     quiz.questions.forEach((q,i)=>{
-      const a = sub.answers[i]||{}; const r = scoreQuestion(q, a);
-      html += `<div class="grade-q"><div class="qnum">Question ${i+1} · ${r.max} pts</div><p class="scenario">${esc(q.scenario)}</p>
-        <div class="two mini"><div><div class="muted">Student's graph</div><div id="gs${i}"></div></div><div><div class="muted">Answer key</div><div id="gk${i}"></div></div></div>
+      const a = sub.answers[i]||{}; const r = scoreQuestion(q, a); const ty = qType(q);
+      html += `<div class="grade-q"><div class="qnum">Question ${i+1} · ${QTYPES[ty]} · ${r.max} pts</div><p class="scenario">${esc(qText(q))}</p>`;
+      if (ty === 'match'){
+        const m = a.m || [];
+        html += `<table><thead><tr><th>Item</th><th>Student</th><th>Key</th></tr></thead><tbody>${q.items.map((it,j)=>{ const ok = String(m[j])===String(it.cat); return `<tr><td>${esc(it.text)}</td><td><span class="pill ${ok?'ok':'bad'}">${m[j]===''||m[j]===undefined?'(blank)':esc(q.cats[m[j]])}</span></td><td>${esc(q.cats[it.cat])}</td></tr>`; }).join('')}</tbody></table>
+          <div class="kv" style="margin-top:8px"><div><span class="pill ${r.auto>=r.max&&r.max>0?'ok':(r.auto>0?'warn':'bad')}">${r.auto}/${r.max}</span></div><div><b>Matching</b> — <span class="muted">${esc(r.parts[0].detail.split(' · ')[0])}</span></div></div>`;
+      } else if (ty === 'mc'){
+        html += `<div class="opts">${q.opts.map((o,oi)=>{ if(!o.trim()) return ''; const chosen = String(a.c)===String(oi), right = q.correct===oi; return `<div class="opt ${right?'right':''} ${chosen&&!right?'wrong':''}">${chosen?'●':'○'} ${String.fromCharCode(65+oi)}. ${esc(o)} ${right?'<span class="pill ok">correct answer</span>':''}${chosen&&!right?'<span class="pill bad">student\'s choice</span>':''}</div>`; }).join('')}</div>
+          <div class="kv" style="margin-top:8px"><div><span class="pill ${r.auto>=r.max&&r.max>0?'ok':'bad'}">${r.auto}/${r.max}</span></div><div><b>Multiple choice</b></div></div>`;
+      } else if (ty === 'fr'){
+        html += `<div class="two"><div><div class="muted">Student's answer</div>${box(a.e)}</div><div><div class="muted">Your model answer</div>${box(q.model)}</div></div>
+          <div style="margin-top:6px"><span class="pill">${q.pts.e} pt</span> ${manualBox(i, q.pts.e)}</div>`;
+      } else {
+        html += `<div class="two mini"><div><div class="muted">Student's graph</div><div id="gs${i}"></div></div><div><div class="muted">Answer key</div><div id="gk${i}"></div></div></div>
         <div class="kv" style="margin-top:8px">${r.parts.map(p=>`<div><span class="pill ${p.got>=p.max&&p.max>0?'ok':(p.got>0?'warn':'bad')}">${p.got}/${p.max}</span></div><div><b>${p.name}</b> — <span class="muted">${esc(p.detail)}</span></div>`).join('')}
-        ${q.askE ? `<div><span class="pill">${q.pts.e} pt</span></div><div><b>Explanation</b><div style="background:var(--soft);padding:8px 10px;border-radius:8px;margin:4px 0;white-space:pre-wrap">${esc(a.e)||'<i class="muted">(blank)</i>'}</div>
-          <label style="display:inline">Points: </label><input type="number" min="0" max="${q.pts.e}" step="0.5" data-m="${i}" value="${g.manual[i]??''}" style="width:70px"></div>` : ''}</div></div>`;
+        ${q.askE ? `<div><span class="pill">${q.pts.e} pt</span></div><div><b>Explanation</b>${box(a.e)}${manualBox(i, q.pts.e)}</div>` : ''}</div>`;
+      }
+      html += `</div>`;
     });
     html += `<div class="grade-q"><label>Comment for this student (goes in the CSV)</label><textarea id="gComment">${esc(g.comment)}</textarea></div>`;
     el.innerHTML = html;
-    quiz.questions.forEach((q,i)=>{ mountGraph($('#gs'+i), sub.answers[i], { interactive:false, id:'gs'+i }); mountGraph($('#gk'+i), q.key, { interactive:false, id:'gk'+i }); });
+    quiz.questions.forEach((q,i)=>{ if (qType(q)==='graph'){ mountGraph($('#gs'+i), sub.answers[i], { interactive:false, id:'gs'+i }); mountGraph($('#gk'+i), q.key, { interactive:false, id:'gk'+i }); } });
     el.addEventListener('input', e=>{ const t=e.target; if (t.dataset.m!==undefined) g.manual[t.dataset.m] = t.value===''?'':Math.min(+t.max, Math.max(0,+t.value||0)); else if (t.id==='gComment') g.comment=t.value; saveAll();
       const tt = totalFor(sub); $('#dtTotal').textContent = `${tt.got} / ${tt.max}`; const tr = $(`#gradeArea tr[data-sid="${sub.sid}"] td:last-child`); if (tr) tr.textContent = `${tt.got}/${tt.max}`; });
   }
